@@ -1,0 +1,134 @@
+use crate::model::{Manifest, Model, Params};
+use anyhow::{Context, Result};
+use std::fs;
+use std::path::{Path, PathBuf};
+
+pub fn get_cache_dir() -> PathBuf {
+    std::env::var("LLAMA_CACHE_DIR")
+        .ok()
+        .map(PathBuf::from)
+        .or_else(|| dirs::cache_dir().map(|p| p.join("llama.cpp")))
+        .unwrap_or_else(|| {
+            let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+            PathBuf::from(home).join(".cache").join("llama.cpp")
+        })
+}
+
+pub fn scan_cache(cache_dir: &Path) -> Result<Vec<Model>> {
+    let mut models = Vec::new();
+
+    if !cache_dir.exists() {
+        anyhow::bail!("Cache directory does not exist: {:?}", cache_dir);
+    }
+
+    let gguf_files: Vec<PathBuf> = fs::read_dir(cache_dir)
+        .context("Failed to read cache directory")?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            entry
+                .path()
+                .extension()
+                .map(|ext| ext == "gguf")
+                .unwrap_or(false)
+        })
+        .map(|entry| entry.path())
+        .collect();
+
+    for gguf_path in gguf_files {
+        let gguf_filename = gguf_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_string();
+
+        let manifest_path = cache_dir.join(format!("manifest={}.json", gguf_filename));
+
+        let (name, mmproj_path) = if manifest_path.exists() {
+            parse_manifest(&manifest_path, &gguf_path, cache_dir)?
+        } else {
+            (gguf_filename.clone(), None)
+        };
+
+        let size = fs::metadata(&gguf_path).map(|m| m.len()).unwrap_or(0);
+
+        models.push(Model {
+            name,
+            gguf_path,
+            size,
+            mmproj_path,
+        });
+    }
+
+    Ok(models)
+}
+
+fn parse_manifest(
+    manifest_path: &Path,
+    _gguf_path: &Path,
+    cache_dir: &Path,
+) -> Result<(String, Option<PathBuf>)> {
+    let content = fs::read_to_string(manifest_path).context("Failed to read manifest file")?;
+    let manifest: Manifest =
+        serde_json::from_str(&content).context("Failed to parse manifest JSON")?;
+
+    let name = manifest
+        .gguf_file
+        .rfilename
+        .split('/')
+        .last()
+        .unwrap_or(&manifest.gguf_file.rfilename)
+        .to_string();
+
+    let mmproj_path = manifest.mmproj_file.map(|mm| {
+        let mm_path = cache_dir.join(&mm.rfilename);
+        if mm_path.exists() {
+            mm_path
+        } else {
+            cache_dir.join(&mm.rfilename)
+        }
+    });
+
+    Ok((name, mmproj_path))
+}
+
+pub fn load_params(cache_dir: &Path) -> Result<Params> {
+    let params_path = cache_dir.join("llama_sel_params.json");
+
+    if !params_path.exists() {
+        return Ok(Params::default());
+    }
+
+    let content = fs::read_to_string(&params_path).context("Failed to read params file")?;
+
+    let params: Params = serde_json::from_str(&content).context("Failed to parse params JSON")?;
+
+    Ok(params)
+}
+
+pub fn format_size(bytes: u64) -> String {
+    const GB: u64 = 1024 * 1024 * 1024;
+    const MB: u64 = 1024 * 1024;
+
+    if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.2} MB", bytes as f64 / MB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+pub fn extract_quantization(name: &str) -> &str {
+    let quant_patterns = [
+        "Q4_K_M", "Q4_K_S", "Q5_K_M", "Q5_K_S", "Q6_K", "Q8_0", "Q4_0", "Q5_0", "I4_XX", "I2_X",
+        "F16", "F32", "MXFP4", "MXFP8", "Q2_K", "Q3_K_L", "Q3_K_M", "Q3_K_S",
+    ];
+
+    for pattern in &quant_patterns {
+        if name.contains(pattern) {
+            return pattern;
+        }
+    }
+
+    "Unknown"
+}
