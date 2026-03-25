@@ -1,11 +1,11 @@
 # llama-sel
 
-A TUI (Text User Interface) model selector for llama.cpp that scans your cache directory, displays available GGUF models, and launches `llama-server` with your selected model.
+A TUI (Text User Interface) model selector for llama.cpp that scans your Hugging Face cache directory, displays available GGUF models, and launches `llama-server` with your selected model.
 
 ## Features
 
 - **Interactive TUI**: Navigate through your models using a terminal-based interface
-- **Model Discovery**: Automatically scans your llama.cpp cache directory for GGUF files
+- **Model Discovery**: Automatically scans your Hugging Face cache directory for GGUF files
 - **Model Details**: Shows model name, size, quantization type, and MMProj information
 - **Smart Launch**: Automatically launches `llama-server` with the selected model
 - **MMProj Support**: Handles multimodal projector files for vision models
@@ -14,7 +14,7 @@ A TUI (Text User Interface) model selector for llama.cpp that scans your cache d
 ## Requirements
 
 - `llama-server` binary must be installed and available in your PATH
-- Models stored in GGUF format in the llama.cpp cache directory
+- Models stored in GGUF format in the Hugging Face cache directory
 
 ## Installation
 
@@ -37,7 +37,7 @@ llama-sel
 ```
 
 The application will:
-1. Scan your llama.cpp cache directory for GGUF models
+1. Scan your Hugging Face cache directory for GGUF models
 2. Display an interactive list of available models
 3. Launch `llama-server` with your selected model
 
@@ -52,7 +52,7 @@ The application will:
 
 ### Cache Directory
 
-By default, models are scanned from `~/.cache/llama.cpp/`. You can override this with:
+By default, models are scanned from `~/.cache/huggingface/`. You can override this with:
 
 ```bash
 export LLAMA_CACHE_DIR=/path/to/your/cache
@@ -60,13 +60,15 @@ export LLAMA_CACHE_DIR=/path/to/your/cache
 
 ### Server Parameters
 
-Create a `llama_sel_params.json` file in your cache directory to customize server launch parameters:
+Create a `llama_sel_params.yaml` file in your cache directory to customize server launch parameters:
 
-```json
-{
-  "ctx_size": 4096,
-  "additional_args": ["--host", "0.0.0.0", "--port", "8080"]
-}
+```yaml
+ctx_size: 4096
+additional_args:
+  - "--host"
+  - "0.0.0.0"
+  - "--port"
+  - "8080"
 ```
 
 Available options:
