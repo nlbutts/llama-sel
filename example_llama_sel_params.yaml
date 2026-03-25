@@ -1,4 +1,5 @@
 ctx_size: 4096
+llama_server_path: "/path/to/llama-server"
 additional_args:
   - "--host"
   - "0.0.0.0"

@@ -41,6 +41,7 @@ pub struct MmprojFile {
 pub struct Params {
     pub ctx_size: Option<u32>,
     pub additional_args: Option<Vec<String>>,
+    pub llama_server_path: Option<String>,
 }
 
 impl Params {
@@ -48,6 +49,7 @@ impl Params {
         Self {
             ctx_size: None,
             additional_args: None,
+            llama_server_path: None,
         }
     }
 }

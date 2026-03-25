@@ -3,7 +3,12 @@ use anyhow::{Context, Result};
 use std::process::Command;
 
 pub fn launch_server(model: &Model, params: &Params) -> Result<()> {
-    let mut cmd = Command::new("llama-server");
+    let server_cmd = params
+        .llama_server_path
+        .as_deref()
+        .unwrap_or("llama-server");
+
+    let mut cmd = Command::new(server_cmd);
 
     cmd.arg("-m").arg(&model.gguf_path);
 
