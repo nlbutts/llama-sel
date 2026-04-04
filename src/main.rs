@@ -10,8 +10,6 @@ fn main() -> Result<()> {
     println!("Scanning cache directory: {:?}", cache_dir);
 
     let mut models = cache::scan_cache(&cache_dir)?;
-
-    // Sort models alphabetically by name
     models.sort_by(|a, b| a.name.cmp(&b.name));
 
     if models.is_empty() {
@@ -21,13 +19,13 @@ fn main() -> Result<()> {
 
     println!("Found {} models", models.len());
 
-    let mut ui = ui::Ui::new(models);
+    let config = cache::load_config(&cache_dir)?;
+    let mut ui = ui::Ui::new(models, config);
 
-    let selected_model = ui.run()?;
+    let (selected_model, config) = ui.run()?;
 
     if let Some(model) = selected_model {
-        let params = cache::load_params(&cache_dir)?;
-        executor::launch_server(&model, &params)?;
+        executor::launch_server(&model, &config)?;
     } else {
         println!("No model selected");
     }

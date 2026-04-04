@@ -1,18 +1,20 @@
-use crate::model::{Model, Params};
+use crate::model::{GlobalConfig, Model};
 use anyhow::{Context, Result};
 use std::process::Command;
 
-pub fn launch_server(model: &Model, params: &Params) -> Result<()> {
-    let server_cmd = params
-        .llama_server_path
+pub fn launch_server(model: &Model, config: &GlobalConfig) -> Result<()> {
+    let model_config = config.get_model_config(&model.name);
+    let server_name = model_config
+        .llama_server
         .as_deref()
-        .unwrap_or("llama-server");
+        .unwrap_or(&config.default_llama_server);
+    let server_cmd = config.get_server_path(server_name);
 
-    let mut cmd = Command::new(server_cmd);
+    let mut cmd = Command::new(&server_cmd);
 
     cmd.arg("-m").arg(&model.gguf_path);
 
-    if let Some(ctx_size) = params.ctx_size {
+    if let Some(ctx_size) = model_config.ctx_size {
         cmd.arg("-c").arg(ctx_size.to_string());
     }
 
@@ -22,14 +24,14 @@ pub fn launch_server(model: &Model, params: &Params) -> Result<()> {
         }
     }
 
-    if let Some(additional_args) = &params.additional_args {
-        cmd.args(additional_args);
+    if let Some(additional_args) = &model_config.additional_args {
+        for arg in additional_args.split_whitespace() {
+            cmd.arg(arg);
+        }
     }
 
-    // Print the full command line for debugging
     println!("Executing command: {:?}", cmd);
 
-    // Wait for the llama-server process to complete before returning
     cmd.status()
         .map(|_| ())
         .context("Failed to start llama-server")

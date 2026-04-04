@@ -65,17 +65,13 @@ Create a `llama_sel_params.yaml` file in your cache directory to customize serve
 ```yaml
 ctx_size: 4096
 llama_server_path: "/path/to/llama-server"
-additional_args:
-  - "--host"
-  - "0.0.0.0"
-  - "--port"
-  - "8080"
+additional_args: "--host 0.0.0.0 --port 8080"
 ```
 
 Available options:
 - `ctx_size`: Context size for the model (e.g., 4096, 8192)
 - `llama_server_path`: Custom path to the llama-server binary
-- `additional_args`: Additional command-line arguments to pass to `llama-server`
+- `additional_args`: Additional command-line arguments to pass to `llama-server` (single string, e.g., "--host 0.0.0.0 --port 8080")
 
 ## Supported Quantizations
 

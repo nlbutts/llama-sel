@@ -1,4 +1,4 @@
-use crate::model::{Manifest, Model, Params};
+use crate::model::{GlobalConfig, LlamaServer, Manifest, Model, ModelConfig};
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -123,18 +123,56 @@ fn parse_manifest(
     Ok((name, mmproj_path))
 }
 
-pub fn load_params(cache_dir: &Path) -> Result<Params> {
-    let params_path = cache_dir.join("llama_sel_params.yaml");
+pub fn load_config(cache_dir: &Path) -> Result<GlobalConfig> {
+    let config_path = cache_dir.join("llama_sel_params.yaml");
 
-    if !params_path.exists() {
-        return Ok(Params::default());
+    if !config_path.exists() {
+        let default_config = GlobalConfig::default();
+        save_config(&config_path, &default_config)?;
+        return Ok(default_config);
     }
 
-    let content = fs::read_to_string(&params_path).context("Failed to read params file")?;
+    let content = fs::read_to_string(&config_path).context("Failed to read config file")?;
+    let config: GlobalConfig =
+        serde_yaml::from_str(&content).context("Failed to parse config YAML")?;
 
-    let params: Params = serde_yaml::from_str(&content).context("Failed to parse params YAML")?;
+    Ok(config)
+}
 
-    Ok(params)
+pub fn save_config(config_path: &Path, config: &GlobalConfig) -> Result<()> {
+    let content = serde_yaml::to_string(config).context("Failed to serialize config")?;
+    fs::write(config_path, content).context("Failed to write config file")?;
+    Ok(())
+}
+
+pub fn add_model_config(config_path: &Path, model_name: &str, config: &ModelConfig) -> Result<()> {
+    let current_content = fs::read_to_string(config_path).context("Failed to read config file")?;
+    let mut global_config: GlobalConfig =
+        serde_yaml::from_str(&current_content).context("Failed to parse config YAML")?;
+
+    global_config
+        .models
+        .insert(model_name.to_string(), config.clone());
+
+    save_config(config_path, &global_config)?;
+    Ok(())
+}
+
+pub fn add_llama_server(config_path: &Path, server: &LlamaServer) -> Result<()> {
+    let current_content = fs::read_to_string(config_path).context("Failed to read config file")?;
+    let mut global_config: GlobalConfig =
+        serde_yaml::from_str(&current_content).context("Failed to parse config YAML")?;
+
+    if !global_config
+        .llama_servers
+        .iter()
+        .any(|s| s.name == server.name)
+    {
+        global_config.llama_servers.push(server.clone());
+        save_config(config_path, &global_config)?;
+    }
+
+    Ok(())
 }
 
 pub fn format_size(bytes: u64) -> String {

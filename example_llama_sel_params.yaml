@@ -1,7 +1,22 @@
-ctx_size: 4096
-llama_server_path: "/path/to/llama-server"
-additional_args:
-  - "--host"
-  - "0.0.0.0"
-  - "--port"
-  - "8080"
+# Default llama-server to use when not specified per-model
+default_llama_server: "llama-server"
+
+# Available llama-servers
+llama_servers:
+  - name: "llama-server"
+    path: "llama-server"
+  - name: "llama-server (custom)"
+    path: "/opt/custom/llama-server"
+
+# Default configuration for new models
+model_defaults:
+  ctx_size: 4096
+  additional_args: "--host 0.0.0.0 --port 8080"
+
+# Per-model configuration overrides
+models:
+  # Example model with custom settings
+  "model-name.gguf":
+    llama_server: "llama-server (custom)"
+    ctx_size: 8192
+    additional_args: "--host 127.0.0.1 --port 8081"
