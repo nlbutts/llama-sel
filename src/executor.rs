@@ -2,13 +2,15 @@ use crate::model::{GlobalConfig, Model};
 use anyhow::{Context, Result};
 use std::process::Command;
 
-pub fn launch_server(model: &Model, config: &GlobalConfig) -> Result<()> {
-    let model_config = config.get_model_config(&model.name);
-    let server_name = model_config
-        .llama_server
-        .as_deref()
-        .unwrap_or(&config.default_llama_server);
+pub fn launch_server(
+    model: &Model,
+    config: &GlobalConfig,
+    selected_server: Option<&str>,
+) -> Result<()> {
+    let server_name = selected_server.unwrap_or(&config.default_llama_server);
     let server_cmd = config.get_server_path(server_name);
+
+    let model_config = config.get_model_config(&model.name);
 
     let mut cmd = Command::new(&server_cmd);
 

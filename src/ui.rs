@@ -32,6 +32,7 @@ pub struct Ui {
     stage: SelectionStage,
     config: GlobalConfig,
     selected_model: Option<Model>,
+    selected_server: Option<String>,
 }
 
 impl Ui {
@@ -47,15 +48,26 @@ impl Ui {
             stage: SelectionStage::Server,
             config,
             selected_model: None,
+            selected_server: None,
         }
     }
 
-    pub fn run(&mut self) -> Result<(Option<Model>, GlobalConfig)> {
+    pub fn run(&mut self) -> Result<(Option<Model>, GlobalConfig, Option<String>)> {
         match enable_raw_mode() {
             Ok(_) => {}
             Err(e) => {
                 eprintln!("Failed to enable raw mode: {}", e);
-                return Ok((self.models.get(0).cloned(), self.config.clone()));
+                eprintln!(
+                    "Using fallback selection (use LLAMA_SERVER_NAME env var to select server)"
+                );
+
+                let selected_model = self.models.get(0).cloned();
+
+                let selected_server = std::env::var("LLAMA_SERVER_NAME")
+                    .ok()
+                    .or_else(|| self.servers.get(0).map(|s| s.name.clone()));
+
+                return Ok((selected_model, self.config.clone(), selected_server));
             }
         }
 
@@ -65,7 +77,29 @@ impl Ui {
             Err(e) => {
                 eprintln!("Failed to execute terminal commands: {}", e);
                 let _ = disable_raw_mode();
-                return Ok((self.models.get(0).cloned(), self.config.clone()));
+
+                let selected_model = self.models.get(0).cloned();
+                let selected_server = std::env::var("LLAMA_SERVER_NAME")
+                    .ok()
+                    .or_else(|| self.servers.get(0).map(|s| s.name.clone()));
+
+                return Ok((selected_model, self.config.clone(), selected_server));
+            }
+        };
+
+        let mut stdout = io::stdout();
+        match execute!(stdout, EnterAlternateScreen, EnableMouseCapture) {
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("Failed to execute terminal commands: {}", e);
+                let _ = disable_raw_mode();
+
+                let selected_model = self.models.get(0).cloned();
+                let selected_server = std::env::var("LLAMA_SERVER_NAME")
+                    .ok()
+                    .or_else(|| self.servers.get(0).map(|s| s.name.clone()));
+
+                return Ok((selected_model, self.config.clone(), selected_server));
             }
         };
 
@@ -76,7 +110,13 @@ impl Ui {
                 eprintln!("Failed to create terminal: {}", e);
                 let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
                 let _ = disable_raw_mode();
-                return Ok((self.models.get(0).cloned(), self.config.clone()));
+
+                let selected_model = self.models.get(0).cloned();
+                let selected_server = std::env::var("LLAMA_SERVER_NAME")
+                    .ok()
+                    .or_else(|| self.servers.get(0).map(|s| s.name.clone()));
+
+                return Ok((selected_model, self.config.clone(), selected_server));
             }
         };
 
@@ -96,7 +136,7 @@ impl Ui {
     fn run_terminal(
         &mut self,
         terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    ) -> Result<(Option<Model>, GlobalConfig)> {
+    ) -> Result<(Option<Model>, GlobalConfig, Option<String>)> {
         loop {
             terminal.draw(|frame| self.render(frame))?;
 
@@ -112,11 +152,15 @@ impl Ui {
                         KeyCode::Enter | KeyCode::Char('o') => {
                             let should_continue = self.handle_enter();
                             if !should_continue {
-                                return Ok((self.selected_model.take(), self.config.clone()));
+                                return Ok((
+                                    self.selected_model.take(),
+                                    self.config.clone(),
+                                    self.selected_server.take(),
+                                ));
                             }
                         }
                         KeyCode::Esc | KeyCode::Char('q') => {
-                            return Ok((None, self.config.clone()));
+                            return Ok((None, self.config.clone(), self.selected_server.take()));
                         }
                         KeyCode::PageUp => {
                             self.page_up();
@@ -149,6 +193,8 @@ impl Ui {
         match self.stage {
             SelectionStage::Server => {
                 if self.selected_index < self.servers.len() {
+                    let server = &self.servers[self.selected_index];
+                    self.selected_server = Some(server.name.clone());
                     self.stage = SelectionStage::Model;
                     self.selected_index = 0;
                     self.list_state.select(Some(0));
@@ -339,6 +385,7 @@ Model Defaults:
                     "No server selected".to_string()
                 }
             }
+
             SelectionStage::Model => {
                 if let Some(selected_model) = self.models.get(self.selected_index) {
                     let model_config = self.config.get_model_config(&selected_model.name);

@@ -22,10 +22,10 @@ fn main() -> Result<()> {
     let config = cache::load_config(&cache_dir)?;
     let mut ui = ui::Ui::new(models, config);
 
-    let (selected_model, config) = ui.run()?;
+    let (selected_model, config, selected_server) = ui.run()?;
 
     if let Some(model) = selected_model {
-        executor::launch_server(&model, &config)?;
+        executor::launch_server(&model, &config, selected_server.as_deref())?;
     } else {
         println!("No model selected");
     }
